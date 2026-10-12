@@ -1,0 +1,6 @@
+{
+  "name": "Emura Official Store — Retail Tech & Paket Data",
+  "description": "Belanja aksesoris HP, aksesoris komputer, dan paket data internet resmi dari Toko Fisik Emura. Pembayaran QRIS, Virtual Account, COD, dan pengiriman instan.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

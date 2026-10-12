@@ -1,0 +1,309 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Hardened Global Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    // Zero-lookup admin check for allow list rules (Cost-Optimization Clause)
+    function isBootstrappedAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'bisnistumbuh@gmail.com';
+    }
+
+    // Full RBAC admin check for single-document operations
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerifiedUser() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // 3. Entity Validation Blueprints (Synchronized with firebase-blueprint.json)
+
+    function isValidAdminUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'createdAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 160 && data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$') &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidProduct(data) {
+      return data.keys().hasAll([
+          'sku', 'name', 'slug', 'categorySlug', 'productType',
+          'price', 'weightGrams', 'stock', 'warrantyMonths',
+          'isActive', 'isHero', 'imageUrl', 'shortSpec',
+          'description', 'provider', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'sku', 'name', 'slug', 'categorySlug', 'productType',
+          'price', 'compareAtPrice', 'weightGrams', 'stock', 'warrantyMonths',
+          'isActive', 'isHero', 'imageUrl', 'shortSpec',
+          'description', 'provider', 'nominalData', 'validityDays',
+          'region', 'fulfillmentMode', 'createdAt', 'updatedAt'
+        ]) &&
+        data.sku is string && data.sku.size() >= 2 && data.sku.size() <= 64 && data.sku.matches('^[A-Z0-9_\\-]+$') &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 140 &&
+        data.slug is string && data.slug.size() >= 2 && data.slug.size() <= 140 && data.slug.matches('^[a-z0-9\\-]+$') &&
+        data.categorySlug is string && data.categorySlug.size() <= 40 &&
+        (data.categorySlug == 'mobile-accessories' || data.categorySlug == 'computer-accessories' || data.categorySlug == 'internet-data') &&
+        data.productType is string && data.productType.size() <= 20 &&
+        (data.productType == 'PHYSICAL' || data.productType == 'DATA_PACKAGE') &&
+        data.price is int && data.price >= 0 && data.price <= 100000000 &&
+        (!('compareAtPrice' in data) || (data.compareAtPrice is int && data.compareAtPrice >= 0 && data.compareAtPrice <= 100000000)) &&
+        data.weightGrams is int && data.weightGrams >= 0 && data.weightGrams <= 50000 &&
+        data.stock is int && data.stock >= 0 && data.stock <= 100000 &&
+        data.warrantyMonths is int && data.warrantyMonths >= 0 && data.warrantyMonths <= 60 &&
+        data.isActive is bool &&
+        data.isHero is bool &&
+        data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 300 &&
+        data.shortSpec is string && data.shortSpec.size() >= 1 && data.shortSpec.size() <= 200 &&
+        data.description is string && data.description.size() >= 1 && data.description.size() <= 2000 &&
+        data.provider is string && data.provider.size() >= 1 && data.provider.size() <= 60 &&
+        (!('nominalData' in data) || (data.nominalData is string && data.nominalData.size() <= 60)) &&
+        (!('validityDays' in data) || (data.validityDays is int && data.validityDays >= 0 && data.validityDays <= 365)) &&
+        (!('region' in data) || (data.region is string && data.region.size() <= 80)) &&
+        (!('fulfillmentMode' in data) || (data.fulfillmentMode is string && data.fulfillmentMode.size() <= 20 && (data.fulfillmentMode == 'MANUAL' || data.fulfillmentMode == 'AUTOMATED'))) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll([
+          'orderNumber', 'ownerId', 'subtotal', 'shippingCost', 'discount', 'total',
+          'status', 'paymentStatus', 'fulfillmentStatus', 'paymentMethod',
+          'itemCount', 'hasPhysical', 'hasDataPackage', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'orderNumber', 'ownerId', 'subtotal', 'shippingCost', 'discount', 'total',
+          'status', 'paymentStatus', 'fulfillmentStatus', 'paymentMethod',
+          'courier', 'courierService', 'trackingNumber', 'digitalSerialCode',
+          'itemCount', 'hasPhysical', 'hasDataPackage', 'createdAt', 'updatedAt'
+        ]) &&
+        data.orderNumber is string && data.orderNumber.size() >= 10 && data.orderNumber.size() <= 40 && data.orderNumber.matches('^EMR-[0-9]{8}-[A-Z0-9]{4,8}$') &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.subtotal is int && data.subtotal >= 0 && data.subtotal <= 500000000 &&
+        data.shippingCost is int && data.shippingCost >= 0 && data.shippingCost <= 10000000 &&
+        data.discount is int && data.discount >= 0 && data.discount <= 50000000 &&
+        data.total is int && data.total >= 0 && data.total <= 500000000 &&
+        data.status is string && data.status.size() <= 24 &&
+        (data.status == 'PENDING_PAYMENT' || data.status == 'PAID' || data.status == 'PROCESSING' || data.status == 'SHIPPED' || data.status == 'COMPLETED' || data.status == 'CANCELLED' || data.status == 'FAILED' || data.status == 'REFUNDED') &&
+        data.paymentStatus is string && data.paymentStatus.size() <= 20 &&
+        (data.paymentStatus == 'PENDING' || data.paymentStatus == 'PAID' || data.paymentStatus == 'EXPIRED' || data.paymentStatus == 'FAILED' || data.paymentStatus == 'REFUNDED') &&
+        data.fulfillmentStatus is string && data.fulfillmentStatus.size() <= 20 &&
+        (data.fulfillmentStatus == 'UNFULFILLED' || data.fulfillmentStatus == 'PARTIAL' || data.fulfillmentStatus == 'FULFILLED' || data.fulfillmentStatus == 'FAILED') &&
+        data.paymentMethod is string && data.paymentMethod.size() <= 20 &&
+        (data.paymentMethod == 'QRIS' || data.paymentMethod == 'VA_BCA' || data.paymentMethod == 'VA_MANDIRI' || data.paymentMethod == 'COD' || data.paymentMethod == 'WHATSAPP') &&
+        (!('courier' in data) || (data.courier is string && data.courier.size() <= 40)) &&
+        (!('courierService' in data) || (data.courierService is string && data.courierService.size() <= 40)) &&
+        (!('trackingNumber' in data) || (data.trackingNumber is string && data.trackingNumber.size() <= 64)) &&
+        (!('digitalSerialCode' in data) || (data.digitalSerialCode is string && data.digitalSerialCode.size() <= 120)) &&
+        data.itemCount is int && data.itemCount >= 1 && data.itemCount <= 100 &&
+        data.hasPhysical is bool &&
+        data.hasDataPackage is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidOrderItem(data) {
+      return data.keys().hasAll([
+          'orderId', 'ownerId', 'productId', 'productName', 'sku', 'productType',
+          'qty', 'unitPrice', 'totalPrice', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'orderId', 'ownerId', 'productId', 'productName', 'sku', 'productType',
+          'variantName', 'qty', 'unitPrice', 'totalPrice', 'targetPhone', 'createdAt'
+        ]) &&
+        data.orderId is string && data.orderId.size() >= 1 && data.orderId.size() <= 128 && data.orderId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.productId is string && data.productId.size() >= 1 && data.productId.size() <= 128 && data.productId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.productName is string && data.productName.size() >= 2 && data.productName.size() <= 140 &&
+        data.sku is string && data.sku.size() >= 2 && data.sku.size() <= 64 && data.sku.matches('^[A-Z0-9_\\-]+$') &&
+        data.productType is string && data.productType.size() <= 20 &&
+        (data.productType == 'PHYSICAL' || data.productType == 'DATA_PACKAGE') &&
+        (!('variantName' in data) || (data.variantName is string && data.variantName.size() <= 80)) &&
+        data.qty is int && data.qty >= 1 && data.qty <= 50 &&
+        data.unitPrice is int && data.unitPrice >= 0 && data.unitPrice <= 100000000 &&
+        data.totalPrice is int && data.totalPrice >= 0 && data.totalPrice <= 500000000 &&
+        (!('targetPhone' in data) || (data.targetPhone is string && data.targetPhone.size() >= 9 && data.targetPhone.size() <= 20 && data.targetPhone.matches('^(08|628)[0-9]{7,12}$'))) &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidOrderPrivatePii(data) {
+      return data.keys().hasAll([
+          'orderId', 'ownerId', 'customerName', 'customerPhone', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'orderId', 'ownerId', 'customerName', 'customerPhone',
+          'customerEmail', 'addressLine', 'city', 'province',
+          'postalCode', 'notes', 'createdAt'
+        ]) &&
+        data.orderId is string && data.orderId.size() >= 1 && data.orderId.size() <= 128 && data.orderId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.customerName is string && data.customerName.size() >= 2 && data.customerName.size() <= 100 &&
+        data.customerPhone is string && data.customerPhone.size() >= 9 && data.customerPhone.size() <= 20 && data.customerPhone.matches('^(08|628)[0-9]{7,12}$') &&
+        (!('customerEmail' in data) || (data.customerEmail is string && data.customerEmail.size() <= 160)) &&
+        (!('addressLine' in data) || (data.addressLine is string && data.addressLine.size() <= 300)) &&
+        (!('city' in data) || (data.city is string && data.city.size() <= 80)) &&
+        (!('province' in data) || (data.province is string && data.province.size() <= 80)) &&
+        (!('postalCode' in data) || (data.postalCode is string && data.postalCode.size() == 5 && data.postalCode.matches('^[0-9]{5}$'))) &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 500)) &&
+        data.createdAt is timestamp;
+    }
+
+    function isTerminalOrderState(status) {
+      return status == 'COMPLETED' || status == 'CANCELLED' || status == 'REFUNDED';
+    }
+
+    // 4. Collection Match Blocks
+
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && isValidId(adminId) && (request.auth.uid == adminId || isAdmin());
+      allow list: if false;
+      allow create: if isAdmin() && isValidId(adminId) && isValidAdminUser(incoming()) && incoming().createdAt == request.time;
+      allow update: if isAdmin() && isValidId(adminId) && isValidAdminUser(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['email']);
+      allow delete: if isAdmin() && isValidId(adminId);
+    }
+
+    match /products/{productId} {
+      allow get: if isValidId(productId) && (existing().isActive == true || isAdmin());
+      allow list: if existing().isActive == true || isBootstrappedAdmin();
+      allow create: if isAdmin() && isValidId(productId) && isValidProduct(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidId(productId) && isValidProduct(incoming()) &&
+        incoming().sku == existing().sku &&
+        incoming().slug == existing().slug &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'price', 'compareAtPrice', 'stock', 'warrantyMonths',
+          'isActive', 'isHero', 'imageUrl', 'shortSpec', 'description',
+          'nominalData', 'validityDays', 'region', 'fulfillmentMode', 'updatedAt'
+        ]);
+      allow delete: if isAdmin() && isValidId(productId);
+    }
+
+    match /orders/{orderId} {
+      allow get: if isSignedIn() && isValidId(orderId) && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().ownerId == request.auth.uid || isBootstrappedAdmin());
+      allow create: if isVerifiedUser() && isValidId(orderId) && isValidOrder(incoming()) &&
+        incoming().ownerId == request.auth.uid &&
+        incoming().status == 'PENDING_PAYMENT' &&
+        incoming().paymentStatus == 'PENDING' &&
+        incoming().fulfillmentStatus == 'UNFULFILLED' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(orderId) && isValidOrder(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().orderNumber == existing().orderNumber &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          (
+            isAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'paymentStatus', 'fulfillmentStatus',
+              'courier', 'courierService', 'trackingNumber',
+              'digitalSerialCode', 'updatedAt'
+            ])
+          ) ||
+          (
+            existing().ownerId == request.auth.uid &&
+            !isTerminalOrderState(existing().status) &&
+            existing().status == 'PENDING_PAYMENT' &&
+            incoming().status == 'CANCELLED' &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          )
+        );
+      allow delete: if isAdmin() && isValidId(orderId);
+
+      // Subcollection: Order Line Items (Master Gate Relational Sync)
+      match /items/{itemId} {
+        allow get: if isSignedIn() && isValidId(orderId) && isValidId(itemId) && (
+          isAdmin() ||
+          get(/databases/$(database)/documents/orders/$(orderId)).data.ownerId == request.auth.uid
+        );
+        allow list: if isSignedIn() && (existing().ownerId == request.auth.uid || isBootstrappedAdmin());
+        allow create: if isVerifiedUser() && isValidId(orderId) && isValidId(itemId) &&
+          isValidOrderItem(incoming()) &&
+          incoming().orderId == orderId &&
+          incoming().ownerId == request.auth.uid &&
+          incoming().createdAt == request.time &&
+          exists(/databases/$(database)/documents/products/$(incoming().productId)) &&
+          exists(/databases/$(database)/documents/orders/$(orderId)) &&
+          get(/databases/$(database)/documents/orders/$(orderId)).data.ownerId == request.auth.uid;
+        allow update: if isAdmin() && isValidId(orderId) && isValidId(itemId) &&
+          isValidOrderItem(incoming()) &&
+          incoming().orderId == existing().orderId &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().productId == existing().productId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['qty', 'totalPrice']);
+        allow delete: if isAdmin() && isValidId(orderId) && isValidId(itemId);
+      }
+
+      // Subcollection: Split PII Isolation (Customer Phone, Email, Address)
+      match /private/{piiId} {
+        allow get: if isSignedIn() && isValidId(orderId) && isValidId(piiId) && (
+          isAdmin() ||
+          get(/databases/$(database)/documents/orders/$(orderId)).data.ownerId == request.auth.uid
+        );
+        allow list: if false;
+        allow create: if isVerifiedUser() && isValidId(orderId) && isValidId(piiId) &&
+          isValidOrderPrivatePii(incoming()) &&
+          incoming().orderId == orderId &&
+          incoming().ownerId == request.auth.uid &&
+          incoming().createdAt == request.time &&
+          exists(/databases/$(database)/documents/orders/$(orderId)) &&
+          get(/databases/$(database)/documents/orders/$(orderId)).data.ownerId == request.auth.uid;
+        allow update: if isVerifiedUser() && isValidId(orderId) && isValidId(piiId) &&
+          isValidOrderPrivatePii(incoming()) &&
+          incoming().orderId == existing().orderId &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().createdAt == existing().createdAt && (
+            (
+              isAdmin() &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'customerName', 'customerPhone', 'customerEmail',
+                'addressLine', 'city', 'province', 'postalCode', 'notes'
+              ])
+            ) ||
+            (
+              existing().ownerId == request.auth.uid &&
+              get(/databases/$(database)/documents/orders/$(orderId)).data.ownerId == request.auth.uid &&
+              !isTerminalOrderState(get(/databases/$(database)/documents/orders/$(orderId)).data.status) &&
+              incoming().diff(existing()).affectedKeys().hasOnly(['addressLine', 'city', 'province', 'postalCode', 'notes'])
+            )
+          );
+        allow delete: if isAdmin() && isValidId(orderId) && isValidId(piiId);
+      }
+    }
+  }
+}

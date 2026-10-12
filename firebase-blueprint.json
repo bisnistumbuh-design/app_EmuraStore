@@ -1,0 +1,468 @@
+{
+  "entities": {
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorized store administrator record for RBAC verification.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the admin."
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 160,
+          "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+          "description": "Verified email address of the admin."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp."
+        }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Retail catalog item representing physical accessories or digital internet data packages.",
+      "type": "object",
+      "properties": {
+        "sku": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[A-Z0-9_\\-]+$",
+          "description": "Unique stock keeping unit code."
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 140,
+          "minLength": 2,
+          "description": "Customer-facing product title."
+        },
+        "slug": {
+          "type": "string",
+          "maxLength": 140,
+          "pattern": "^[a-z0-9\\-]+$",
+          "description": "URL-safe identifier."
+        },
+        "categorySlug": {
+          "type": "string",
+          "enum": ["mobile-accessories", "computer-accessories", "internet-data"],
+          "maxLength": 40,
+          "description": "Primary catalog category slug."
+        },
+        "productType": {
+          "type": "string",
+          "enum": ["PHYSICAL", "DATA_PACKAGE"],
+          "maxLength": 20,
+          "description": "Fulfillment classification."
+        },
+        "price": {
+          "type": "number",
+          "description": "Selling price in IDR."
+        },
+        "compareAtPrice": {
+          "type": "number",
+          "description": "Original strike-through price in IDR."
+        },
+        "weightGrams": {
+          "type": "number",
+          "description": "Physical weight in grams (0 for data packages)."
+        },
+        "stock": {
+          "type": "number",
+          "description": "Available inventory units."
+        },
+        "warrantyMonths": {
+          "type": "number",
+          "description": "Official Emura store warranty duration in months."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the product is visible in the public catalog."
+        },
+        "isHero": {
+          "type": "boolean",
+          "description": "Whether the product is featured on the home page."
+        },
+        "imageUrl": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Primary product image path or URL."
+        },
+        "shortSpec": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Concise technical summary."
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "Full product specification and warranty details."
+        },
+        "provider": {
+          "type": "string",
+          "maxLength": 60,
+          "description": "Telco provider name for data packages or hardware brand."
+        },
+        "nominalData": {
+          "type": "string",
+          "maxLength": 60,
+          "description": "Quota specification for internet data packages."
+        },
+        "validityDays": {
+          "type": "number",
+          "description": "Active period in days for internet data packages."
+        },
+        "region": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Coverage region (e.g., Nasional)."
+        },
+        "fulfillmentMode": {
+          "type": "string",
+          "enum": ["MANUAL", "AUTOMATED"],
+          "maxLength": 20,
+          "description": "Top-up execution mode."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation server timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update server timestamp."
+        }
+      },
+      "required": [
+        "sku",
+        "name",
+        "slug",
+        "categorySlug",
+        "productType",
+        "price",
+        "weightGrams",
+        "stock",
+        "warrantyMonths",
+        "isActive",
+        "isHero",
+        "imageUrl",
+        "shortSpec",
+        "description",
+        "provider",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Order header record containing non-PII financial totals, fulfillment state, and owner reference.",
+      "type": "object",
+      "properties": {
+        "orderNumber": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^EMR-[0-9]{8}-[A-Z0-9]{4,8}$",
+          "description": "Human-readable Emura order code."
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase UID of the customer who placed the order."
+        },
+        "subtotal": {
+          "type": "number",
+          "description": "Items subtotal in IDR."
+        },
+        "shippingCost": {
+          "type": "number",
+          "description": "Courier shipping cost in IDR."
+        },
+        "discount": {
+          "type": "number",
+          "description": "Applied promo discount in IDR."
+        },
+        "total": {
+          "type": "number",
+          "description": "Final payable amount in IDR."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "PENDING_PAYMENT",
+            "PAID",
+            "PROCESSING",
+            "SHIPPED",
+            "COMPLETED",
+            "CANCELLED",
+            "FAILED",
+            "REFUNDED"
+          ],
+          "maxLength": 24,
+          "description": "Overall order lifecycle state."
+        },
+        "paymentStatus": {
+          "type": "string",
+          "enum": ["PENDING", "PAID", "EXPIRED", "FAILED", "REFUNDED"],
+          "maxLength": 20,
+          "description": "Payment gateway state."
+        },
+        "fulfillmentStatus": {
+          "type": "string",
+          "enum": ["UNFULFILLED", "PARTIAL", "FULFILLED", "FAILED"],
+          "maxLength": 20,
+          "description": "Physical or digital delivery status."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["QRIS", "VA_BCA", "VA_MANDIRI", "COD", "WHATSAPP"],
+          "maxLength": 20,
+          "description": "Selected payment channel."
+        },
+        "courier": {
+          "type": "string",
+          "maxLength": 40,
+          "description": "Selected logistics carrier."
+        },
+        "courierService": {
+          "type": "string",
+          "maxLength": 40,
+          "description": "Courier service tier (e.g., REG, EZ)."
+        },
+        "trackingNumber": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Airway bill tracking number."
+        },
+        "digitalSerialCode": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "SN / reference code for data package top-up."
+        },
+        "itemCount": {
+          "type": "number",
+          "description": "Total quantity of items in the order."
+        },
+        "hasPhysical": {
+          "type": "boolean",
+          "description": "True if order includes physical goods."
+        },
+        "hasDataPackage": {
+          "type": "boolean",
+          "description": "True if order includes digital data packages."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Order creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last status change timestamp."
+        }
+      },
+      "required": [
+        "orderNumber",
+        "ownerId",
+        "subtotal",
+        "shippingCost",
+        "discount",
+        "total",
+        "status",
+        "paymentStatus",
+        "fulfillmentStatus",
+        "paymentMethod",
+        "itemCount",
+        "hasPhysical",
+        "hasDataPackage",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "OrderItem": {
+      "title": "OrderItem",
+      "description": "Subcollection line item linked to a parent Order.",
+      "type": "object",
+      "properties": {
+        "orderId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Parent order ID."
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Customer Firebase UID for O(1) list query enforcement."
+        },
+        "productId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Referenced catalog product ID."
+        },
+        "productName": {
+          "type": "string",
+          "maxLength": 140,
+          "description": "Snapshot of product title."
+        },
+        "sku": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[A-Z0-9_\\-]+$",
+          "description": "Snapshot of SKU."
+        },
+        "productType": {
+          "type": "string",
+          "enum": ["PHYSICAL", "DATA_PACKAGE"],
+          "maxLength": 20,
+          "description": "Product type."
+        },
+        "variantName": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Selected variant label."
+        },
+        "qty": {
+          "type": "number",
+          "description": "Quantity purchased."
+        },
+        "unitPrice": {
+          "type": "number",
+          "description": "Unit price in IDR."
+        },
+        "totalPrice": {
+          "type": "number",
+          "description": "Line total price in IDR."
+        },
+        "targetPhone": {
+          "type": "string",
+          "maxLength": 20,
+          "pattern": "^(08|628)[0-9]{7,12}$",
+          "description": "Destination MSISDN for data package top-up."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp."
+        }
+      },
+      "required": [
+        "orderId",
+        "ownerId",
+        "productId",
+        "productName",
+        "sku",
+        "productType",
+        "qty",
+        "unitPrice",
+        "totalPrice",
+        "createdAt"
+      ]
+    },
+    "OrderPrivatePii": {
+      "title": "OrderPrivatePii",
+      "description": "Isolated PII subcollection document containing recipient phone, email, and street address.",
+      "type": "object",
+      "properties": {
+        "orderId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Parent order ID."
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Customer Firebase UID."
+        },
+        "customerName": {
+          "type": "string",
+          "maxLength": 100,
+          "minLength": 2,
+          "description": "Recipient full name."
+        },
+        "customerPhone": {
+          "type": "string",
+          "maxLength": 20,
+          "pattern": "^(08|628)[0-9]{7,12}$",
+          "description": "Indonesian mobile/WhatsApp number."
+        },
+        "customerEmail": {
+          "type": "string",
+          "maxLength": 160,
+          "description": "Optional customer email."
+        },
+        "addressLine": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Street address for physical shipment."
+        },
+        "city": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Destination city."
+        },
+        "province": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Destination province."
+        },
+        "postalCode": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^[0-9]{5}$",
+          "description": "5-digit Indonesian postal code."
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Delivery instructions or top-up notes."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp."
+        }
+      },
+      "required": [
+        "orderId",
+        "ownerId",
+        "customerName",
+        "customerPhone",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": "AdminUser",
+      "description": "Admin role directory."
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Publicly browsable active products and admin-managed inventory."
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer orders containing non-PII financial and status metadata."
+    },
+    "/orders/{orderId}/items/{itemId}": {
+      "schema": "OrderItem",
+      "description": "Order line items subcollection (avoids unbounded arrays)."
+    },
+    "/orders/{orderId}/private/{piiId}": {
+      "schema": "OrderPrivatePii",
+      "description": "Split collection isolating customer PII (phone, email, address)."
+    }
+  }
+}
