@@ -255,6 +255,7 @@ export default function App() {
                   ...serverProd,
                   price: seedMatch.price,
                   compareAtPrice: seedMatch.compareAtPrice,
+                  imageUrl: seedMatch.imageUrl,
                 }
               : serverProd;
           });

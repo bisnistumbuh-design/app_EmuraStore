@@ -21,8 +21,9 @@ export const EmuraLogo: React.FC<EmuraLogoProps> = ({
   wordmarkClassName = 'text-slate-900',
   subtitle,
 }) => {
-  const maskId = React.useId();
-  const gradId = React.useId();
+  const rawId = React.useId().replace(/[^a-zA-Z0-9_-]/g, '');
+  const maskId = `emura-logo-mask-${rawId}`;
+  const gradId = `emura-logo-grad-${rawId}`;
 
   return (
     <div className="inline-flex items-center gap-2.5 select-none">

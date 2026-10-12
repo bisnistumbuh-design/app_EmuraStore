@@ -28,6 +28,7 @@ import {
   ProductType,
 } from '../types/commerce.ts';
 import { EmuraLogo } from './EmuraLogo.tsx';
+import { ResilientImage } from './ResilientImage.tsx';
 
 interface AdminDashboardViewProps {
   currentUser: FirebaseUser | null;
@@ -595,11 +596,20 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                   key={p.id}
                   className="py-3 flex items-center justify-between gap-4 text-xs"
                 >
-                  <div>
-                    <p className="font-bold text-sm text-[#072B2D]">{p.name}</p>
-                    <p className="text-slate-500 font-mono-tabular">
-                      SKU: {p.sku} · {p.categoryName} · {p.provider}
-                    </p>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-[#F8F9FA] border border-slate-200 shrink-0">
+                      <ResilientImage
+                        src={p.imageUrl}
+                        alt={p.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm text-[#072B2D] truncate">{p.name}</p>
+                      <p className="text-slate-500 font-mono-tabular truncate">
+                        SKU: {p.sku} · {p.categoryName} · {p.provider}
+                      </p>
+                    </div>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-extrabold font-mono-tabular text-sm text-[#008B94]">
