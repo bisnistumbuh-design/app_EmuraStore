@@ -35,7 +35,7 @@ Tagline toko: *Pusat Aksesoris HP, Audio TWS, Charger GaN & Gear Komputer Bergar
 | State | Zustand (cart dengan persist) |
 | Backend | Express 4 (`server.ts`) + Vite middleware |
 | Validasi | Zod |
-| Auth & Data | Firebase Auth (Google) + Cloud Firestore |
+| Auth & Data | Firebase Auth (Google) + Supabase (orders) + Cloud Firestore (product sync) |
 | AI | `@google/genai` |
 
 ## Prasyarat
@@ -75,8 +75,14 @@ Salin [.env.example](file:///d:/Github/Code/app_EmuraStore/.env.example) menjadi
 | `XENDIT_SECRET_KEY` | Kredensial payment gateway Xendit |
 | `BITESHIP_API_KEY` | Kredensial agregator logistik Biteship |
 | `WHATSAPP_NUMBER` | Nomor WhatsApp toko, mis. `6281223344556` |
+| `SUPABASE_URL` | Project URL Supabase untuk backend Express |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key Supabase (server-side only; jangan pernah diekspos ke browser) |
 
 > Payment gateway dan logistik saat ini dijalankan melalui **adapter mock** di `server.ts` (kontrak menyerupai Midtrans/Xendit/Biteship) sehingga alur checkout dapat diuji tanpa kredensial nyata.
+
+### Supabase Orders
+
+Jalankan SQL pada `supabase/migrations/20261017000000_create_orders.sql` melalui Supabase SQL Editor (atau Supabase CLI), lalu isi `SUPABASE_URL` dan `SUPABASE_SERVICE_ROLE_KEY` pada environment server. Checkout dan endpoint perubahan status pesanan menggunakan tabel `public.orders`; data lengkap disimpan pada kolom JSONB `order_data`, sementara nomor pesanan, telepon, total, status, dan waktu pembuatan tersedia sebagai kolom tabel. Tabel mengaktifkan RLS tanpa policy publik; akses aplikasi dilakukan dari Express menggunakan service-role key. Firebase Auth Google tetap digunakan untuk login; pesanan baru tidak lagi disalin ke Firestore.
 
 ## Struktur Proyek
 
@@ -88,10 +94,12 @@ Salin [.env.example](file:///d:/Github/Code/app_EmuraStore/.env.example) menjadi
 │   ├── components/               # Kartu produk, PDP, checkout, admin, modal, dll.
 │   ├── data/seedCatalog.ts       # Katalog awal & profil toko (STORE_INFO)
 │   ├── lib/firebase.ts           # Inisialisasi Firebase, Auth, sinkronisasi Firestore
+│   ├── lib/supabaseOrders.ts     # Penyimpanan pesanan backend Supabase
 │   ├── lib/formatters.ts         # Format Rupiah, validasi HP, deteksi operator, link WhatsApp
 │   ├── store/useCartStore.ts     # State keranjang (Zustand + persist)
 │   └── types/commerce.ts         # Tipe & enum domain commerce
 ├── firestore.rules               # Aturan keamanan Firestore (production)
+├── supabase/migrations/           # Skema database Supabase
 ├── DRAFT_firestore.rules         # Draf aturan
 ├── firestore.rules.test.ts       # Test-case keamanan "Dirty Dozen" (deklaratif)
 ├── security_spec.md              # Spesifikasi keamanan Firestore (Phase 0 TDD)

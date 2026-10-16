@@ -22,7 +22,6 @@ import { STORE_INFO } from '../data/seedCatalog.ts';
 import {
   FirebaseUser,
   sanitizePhoneInput,
-  syncOrderToFirestore,
 } from '../lib/firebase.ts';
 import {
   buildWhatsAppLink,
@@ -217,14 +216,6 @@ export const CartCheckoutView: React.FC<CartCheckoutViewProps> = ({
       }
 
       const createdOrder: OrderRecord = data.order;
-
-      if (currentUser && currentUser.emailVerified) {
-        try {
-          await syncOrderToFirestore(createdOrder);
-        } catch {
-          // Non-blocking
-        }
-      }
 
       clearCart();
       onOrderCreated(createdOrder);

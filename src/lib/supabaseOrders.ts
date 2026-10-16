@@ -64,13 +64,22 @@ export async function saveOrderRecord(order: OrderRecord): Promise<void> {
 export async function getOrderRecord(
   identifier: string
 ): Promise<OrderRecord | null> {
-  const { data, error } = await getClient()
+  const database = getClient();
+  const byNumber = await database
     .from('orders')
     .select('order_data')
-    .or(`order_number.eq.${identifier},id.eq.${identifier}`)
+    .eq('order_number', identifier)
     .maybeSingle();
-  throwIfError(error);
-  return (data?.order_data as OrderRecord | undefined) ?? null;
+  throwIfError(byNumber.error);
+  if (byNumber.data) return byNumber.data.order_data as OrderRecord;
+
+  const byId = await database
+    .from('orders')
+    .select('order_data')
+    .eq('id', identifier)
+    .maybeSingle();
+  throwIfError(byId.error);
+  return (byId.data?.order_data as OrderRecord | undefined) ?? null;
 }
 
 export async function listOrderRecords(): Promise<OrderRecord[]> {

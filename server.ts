@@ -619,7 +619,6 @@ app.post('/api/webhooks/payment', async (req, res) => {
     return;
   }
 
-  processedWebhookEvents.add(eventKey);
   const nowIso = new Date().toISOString();
 
   if (transaction_status === 'settlement' || transaction_status === 'capture') {
@@ -683,6 +682,7 @@ app.post('/api/webhooks/payment', async (req, res) => {
     res.status(503).json({ error: 'Tidak dapat menyimpan status pembayaran.' });
     return;
   }
+  processedWebhookEvents.add(eventKey);
 
   res.json({ status: 'OK', order });
 });
@@ -756,15 +756,17 @@ app.get('/api/orders/track', async (req, res) => {
   try {
     const allOrders = await listOrderRecords();
     const matches = allOrders.filter((ord) => {
-    const matchOrderNum = orderNumber ? ord.orderNumber.toUpperCase() === orderNumber : true;
-    const cleanOrdPhone = ord.customerPhone.replace(/[^0-9]/g, '');
-    const matchPhone = phone
-      ? cleanOrdPhone.endsWith(phone.slice(-8)) ||
-        ord.digitalFulfillments.some((df) =>
-          df.phoneNumber.replace(/[^0-9]/g, '').endsWith(phone.slice(-8))
-        )
-      : true;
-    return matchOrderNum && matchPhone;
+      const matchOrderNum = orderNumber
+        ? ord.orderNumber.toUpperCase() === orderNumber
+        : true;
+      const cleanOrdPhone = ord.customerPhone.replace(/[^0-9]/g, '');
+      const matchPhone = phone
+        ? cleanOrdPhone.endsWith(phone.slice(-8)) ||
+          ord.digitalFulfillments.some((df) =>
+            df.phoneNumber.replace(/[^0-9]/g, '').endsWith(phone.slice(-8))
+          )
+        : true;
+      return matchOrderNum && matchPhone;
     });
 
     res.json({ orders: matches });
