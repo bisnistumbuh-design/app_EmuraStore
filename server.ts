@@ -3,10 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { z } from 'zod';
+import {
+  createOrderRecord,
+  getOrderRecord,
+  listOrderRecords,
+  saveOrderRecord,
+} from './src/lib/supabaseOrders.ts';
 import { INITIAL_PRODUCTS, STORE_INFO } from './src/data/seedCatalog.ts';
 import {
   DigitalFulfillmentRecord,
@@ -32,7 +39,6 @@ const catalogStore: Map<string, Product> = new Map(
   INITIAL_PRODUCTS.map((p) => [p.id, { ...p }])
 );
 
-const ordersStore: Map<string, OrderRecord> = new Map();
 const processedWebhookEvents: Set<string> = new Set();
 
 function seedInitialOrders() {
@@ -168,11 +174,7 @@ function seedInitialOrders() {
     updatedAt: budiOrderTime,
   };
 
-  ordersStore.set(rinaOrder.orderNumber, rinaOrder);
-  ordersStore.set(budiOrder.orderNumber, budiOrder);
 }
-
-seedInitialOrders();
 
 /**
  * Adapter 1: Payment Gateway Adapter (Midtrans / Xendit Contract)
@@ -413,7 +415,7 @@ const createOrderSchema = z.object({
     .min(1),
 });
 
-app.post('/api/orders', (req, res) => {
+app.post('/api/orders', async (req, res) => {
   const parsed = createOrderSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -538,14 +540,28 @@ app.post('/api/orders', (req, res) => {
     updatedAt: nowIso,
   };
 
-  ordersStore.set(orderNumber, newOrder);
-  res.status(201).json({ order: newOrder });
+  try {
+    await createOrderRecord(newOrder);
+    res.status(201).json({ order: newOrder });
+  } catch (error) {
+    console.error('Failed to persist order to Supabase:', error);
+    res.status(503).json({
+      error: 'Tidak dapat menyimpan pesanan saat ini. Silakan coba lagi beberapa saat.',
+    });
+  }
 });
 
 // 4. Create / Refresh Payment (PRD Section 3.4 Endpoint)
-app.post('/api/payments/create', (req, res) => {
+app.post('/api/payments/create', async (req, res) => {
   const { orderId, method } = req.body;
-  const order = ordersStore.get(orderId);
+  let order: OrderRecord | null;
+  try {
+    order = await getOrderRecord(String(orderId || ''));
+  } catch (error) {
+    console.error('Failed to read order from Supabase:', error);
+    res.status(503).json({ error: 'Database pesanan tidak tersedia.' });
+    return;
+  }
   if (!order) {
     res.status(404).json({ error: 'Order tidak ditemukan.' });
     return;
@@ -560,7 +576,13 @@ app.post('/api/payments/create', (req, res) => {
   order.payment = updatedPayment;
   order.paymentMethod = updatedPayment.method;
   order.updatedAt = new Date().toISOString();
-  ordersStore.set(order.orderNumber, order);
+  try {
+    await saveOrderRecord(order);
+  } catch (error) {
+    console.error('Failed to update payment in Supabase:', error);
+    res.status(503).json({ error: 'Tidak dapat menyimpan perubahan pembayaran.' });
+    return;
+  }
 
   res.json({
     paymentId: updatedPayment.id,
@@ -575,7 +597,7 @@ app.post('/api/payments/create', (req, res) => {
 });
 
 // 5. Payment Webhook Handler (PRD Section 3.4 & Step 11)
-app.post('/api/webhooks/payment', (req, res) => {
+app.post('/api/webhooks/payment', async (req, res) => {
   const { order_id, transaction_status, transaction_id } = req.body;
   const eventKey = `${order_id}_${transaction_status}_${transaction_id || 'sim'}`;
 
@@ -584,7 +606,14 @@ app.post('/api/webhooks/payment', (req, res) => {
     return;
   }
 
-  const order = ordersStore.get(order_id);
+  let order: OrderRecord | null;
+  try {
+    order = await getOrderRecord(String(order_id || ''));
+  } catch (error) {
+    console.error('Failed to read order for payment webhook:', error);
+    res.status(503).json({ error: 'Database pesanan tidak tersedia.' });
+    return;
+  }
   if (!order) {
     res.status(404).json({ error: 'Order tidak ditemukan.' });
     return;
@@ -647,15 +676,28 @@ app.post('/api/webhooks/payment', (req, res) => {
   }
 
   order.updatedAt = nowIso;
-  ordersStore.set(order.orderNumber, order);
+  try {
+    await saveOrderRecord(order);
+  } catch (error) {
+    console.error('Failed to persist payment webhook:', error);
+    res.status(503).json({ error: 'Tidak dapat menyimpan status pembayaran.' });
+    return;
+  }
 
   res.json({ status: 'OK', order });
 });
 
 // 6. Book Shipping via Biteship Adapter (PRD Section 3.4 & Step 12)
-app.post('/api/shipping/book', (req, res) => {
+app.post('/api/shipping/book', async (req, res) => {
   const { orderId, courier, service } = req.body;
-  const order = ordersStore.get(orderId);
+  let order: OrderRecord | null;
+  try {
+    order = await getOrderRecord(String(orderId || ''));
+  } catch (error) {
+    console.error('Failed to read order for shipment:', error);
+    res.status(503).json({ error: 'Database pesanan tidak tersedia.' });
+    return;
+  }
   if (!order) {
     res.status(404).json({ error: 'Order tidak ditemukan.' });
     return;
@@ -679,7 +721,13 @@ app.post('/api/shipping/book', (req, res) => {
       : FulfillmentStatus.FULFILLED;
   order.updatedAt = new Date().toISOString();
 
-  ordersStore.set(order.orderNumber, order);
+  try {
+    await saveOrderRecord(order);
+  } catch (error) {
+    console.error('Failed to persist shipment:', error);
+    res.status(503).json({ error: 'Tidak dapat menyimpan data pengiriman.' });
+    return;
+  }
   res.json({
     shipmentId: booked.id,
     trackingNumber: booked.trackingNumber,
@@ -691,20 +739,23 @@ app.post('/api/shipping/book', (req, res) => {
 });
 
 // 7. Track / List Orders
-app.get('/api/orders/track', (req, res) => {
+app.get('/api/orders/track', async (req, res) => {
   const orderNumber = String(req.query.orderNumber || '').trim().toUpperCase();
   const phone = String(req.query.phone || '').replace(/[^0-9]/g, '');
 
   if (!orderNumber && !phone) {
-    // Return all orders sorted newest first
-    const allOrders = Array.from(ordersStore.values()).sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-    res.json({ orders: allOrders });
+    try {
+      res.json({ orders: await listOrderRecords() });
+    } catch (error) {
+      console.error('Failed to list orders from Supabase:', error);
+      res.status(503).json({ error: 'Tidak dapat memuat pesanan saat ini.' });
+    }
     return;
   }
 
-  const matches = Array.from(ordersStore.values()).filter((ord) => {
+  try {
+    const allOrders = await listOrderRecords();
+    const matches = allOrders.filter((ord) => {
     const matchOrderNum = orderNumber ? ord.orderNumber.toUpperCase() === orderNumber : true;
     const cleanOrdPhone = ord.customerPhone.replace(/[^0-9]/g, '');
     const matchPhone = phone
@@ -714,13 +765,24 @@ app.get('/api/orders/track', (req, res) => {
         )
       : true;
     return matchOrderNum && matchPhone;
-  });
+    });
 
-  res.json({ orders: matches });
+    res.json({ orders: matches });
+  } catch (error) {
+    console.error('Failed to track order from Supabase:', error);
+    res.status(503).json({ error: 'Tidak dapat melacak pesanan saat ini.' });
+  }
 });
 
-app.get('/api/orders/:orderNumber', (req, res) => {
-  const order = ordersStore.get(req.params.orderNumber.toUpperCase());
+app.get('/api/orders/:orderNumber', async (req, res) => {
+  let order: OrderRecord | null;
+  try {
+    order = await getOrderRecord(req.params.orderNumber.toUpperCase());
+  } catch (error) {
+    console.error('Failed to read order from Supabase:', error);
+    res.status(503).json({ error: 'Database pesanan tidak tersedia.' });
+    return;
+  }
   if (!order) {
     res.status(404).json({ error: 'Pesanan tidak ditemukan.' });
     return;
@@ -729,8 +791,15 @@ app.get('/api/orders/:orderNumber', (req, res) => {
 });
 
 // 8. Admin: Fulfill Digital Data Package (Manual Top-Up / Retry / Refund)
-app.post('/api/admin/orders/:orderNumber/fulfill-digital', (req, res) => {
-  const order = ordersStore.get(req.params.orderNumber.toUpperCase());
+app.post('/api/admin/orders/:orderNumber/fulfill-digital', async (req, res) => {
+  let order: OrderRecord | null;
+  try {
+    order = await getOrderRecord(req.params.orderNumber.toUpperCase());
+  } catch (error) {
+    console.error('Failed to read order for fulfillment:', error);
+    res.status(503).json({ error: 'Database pesanan tidak tersedia.' });
+    return;
+  }
   if (!order) {
     res.status(404).json({ error: 'Pesanan tidak ditemukan.' });
     return;
@@ -783,7 +852,13 @@ app.post('/api/admin/orders/:orderNumber/fulfill-digital', (req, res) => {
   }
 
   order.updatedAt = nowIso;
-  ordersStore.set(order.orderNumber, order);
+  try {
+    await saveOrderRecord(order);
+  } catch (error) {
+    console.error('Failed to persist digital fulfillment:', error);
+    res.status(503).json({ error: 'Tidak dapat menyimpan status pemenuhan pesanan.' });
+    return;
+  }
   res.json({ order });
 });
 
