@@ -11,10 +11,8 @@ Tagline toko: *Pusat Aksesoris HP, Audio TWS, Charger GaN & Gear Komputer Bergar
 - Halaman detail produk (PDP), quick view, perbandingan produk, dan wishlist.
 - Keranjang belanja persisten (tersimpan di `localStorage` via Zustand `persist`).
 - Checkout dengan alamat pengiriman, kalkulasi ongkir, dan pemilihan kurir.
-- Kode promo: `EMURAONLINE` (diskon 10%, maks. Rp25.000) dan `HEMATONGKIR` (potongan Rp15.000).
-- Gratis ongkir untuk belanja mulai **Rp300.000**.
+- Kode promo: Kode Promo bagi Pelanggan yang diberikan oleh EmuraID.
 - Halaman sukses pesanan + pelacakan pesanan berdasarkan nomor pesanan/nomor HP.
-- Login Google (Firebase Auth) untuk riwayat pesanan.
 
 **Admin Toko**
 - Tab **Pesanan**: filter *Belum Bayar / Perlu Dikirim / Dikirim–Selesai*.
