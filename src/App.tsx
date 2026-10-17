@@ -1651,9 +1651,6 @@ export default function App() {
 
         {view === 'admin' && (
           <AdminDashboardView
-            currentUser={currentUser}
-            products={products}
-            onProductsUpdated={fetchCatalog}
             onInspectOrder={(ord) => {
               setActiveOrder(ord);
               setView('order-track');
